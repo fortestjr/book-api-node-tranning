@@ -7,7 +7,6 @@ const router = express.Router();
 
 // Create a book
 router.post('/', authorize, createBook)
-router.post('/:bookid' , authenticate , addBookToUserCollection)
 
 // Get all books for a user
 router.get('/', getBooksByFIlter)

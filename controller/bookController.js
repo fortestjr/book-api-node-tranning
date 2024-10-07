@@ -175,7 +175,7 @@ export const addBookToUserCollection = async (req, res) => {
 
     try {
         const pool = await connectDb()
-        const request = pool.request()
+        const request = new sql.Request(pool)
 
         const bookExistsQuery = 'SELECT * FROM [books] WHERE bookid = @bookid';
         const bookCheck = await request.input('bookid', sql.Int, bookid).query(bookExistsQuery);
@@ -187,17 +187,19 @@ export const addBookToUserCollection = async (req, res) => {
         const userBookExistsQuery = 'SELECT * FROM [user_books] WHERE userid = @userid AND bookid = @bookid'
         const userBookCheck = await request
             .input('userid', sql.Int, userid)
-            .input('bookid', sql.Int, bookid)
             .query(userBookExistsQuery)
 
         if (userBookCheck.recordset.length > 0) {
             return res.status(400).json({ error: 'Book is already in your collection' })
         }
 
-        const insertQuery = 'INSERT INTO [user_books] (userid, bookid) VALUES (@userid, @bookid)';
-        await request.query(insertQuery)
+        const insertQuery = 'INSERT INTO [user_books] (userid, bookid) OUTPUT INSERTED.* VALUES (@userid, @bookid);'
+        const insertedBook = await request.query(insertQuery)
 
-        res.status(200).json({ message: 'Book added to your collection successfully' })
+        res.status(200).json({ 
+            message: 'Book added to your collection successfully' ,
+            insertedBook
+        })
     } catch (error) {
         console.error('Error adding book to collection:', error)
         res.status(500).json({ error: 'Failed to add book to your collection' })

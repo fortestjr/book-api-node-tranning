@@ -9,7 +9,7 @@ const authenticate = async (req , res , next) => {
     try {
         const pool = await connectDb()
         const request = new sql.Request(pool)
-        const token = req.headers['x-auth-token']
+        const token = req.headers['x-auth']
 
         if (!token) {
             return res.status(401).send('No token provided')

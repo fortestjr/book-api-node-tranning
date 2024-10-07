@@ -1,6 +1,7 @@
 import express from 'express';
 import authenticate from '../middlewares/auth.js';
 import { getMyBooks, register , logIn } from '../controller/userController.js';
+import { addBookToUserCollection } from '../controller/bookController.js';
 
 const router = express.Router();
 
@@ -11,5 +12,7 @@ router.post('/register', register)
 router.post('/login', logIn)
 
 router.get("/:userid" , authenticate , getMyBooks)
+router.post('/book/:bookid' , authenticate , addBookToUserCollection)
+
 
 export default router;
