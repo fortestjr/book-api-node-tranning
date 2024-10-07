@@ -129,34 +129,28 @@ export const getBooksByFIlter = async (req, res) => {
     
     const { title, author, genre } = req.query
     const pool = await connectDb()
+    const request = new sql.Request(pool)
 
     try {
-        // Base query for selecting all books
-        let query = 'SELECT * FROM [books] WHERE 1=1;'
+        let query = 'SELECT * FROM [books] WHERE 1=1'
         
         if (title) {
-            query += ' AND title LIKE @title;'
+            query += ' AND title LIKE @title'
+            request.input('title', sql.NVarChar , `%${title}%`)
+
         }
         if (author) {
-            query += ' AND author LIKE @author;'
+            query += ' AND author LIKE @author'
+            request.input('author', sql.NVarChar , `%${author}%`)
+
         }
         if (genre) {
             query += ' AND genre LIKE @genre;'
+            request.input('genre', sql.NVarChar , `%${genre}%`)
+
         }
 
-        const request = new sql.Request(pool)
-            request.input('userid', req.user.userid)
-
-        // Add parameters for filtering if provided
-        if (title) {
-            request.input('title', `%${title}%`)
-        }
-        if (author) {
-            request.input('author', `%${author}%`)
-        }
-        if (genre) {
-            request.input('genre', `%${genre}%`)
-        }
+        request.input('userid', sql.Int , res.locals.userid)
 
         const result = await request.query(query)
         res.json(result.recordset)

@@ -9,9 +9,9 @@ const router = express.Router();
 router.post('/', authorize, createBook)
 
 // Get all books for a user
-router.get('/', getBooksByFIlter)
+router.get('/', authenticate , getBooksByFIlter)
 
-router.get('/:userid', authenticate, getBookByUserId)
+// router.get('/:userid', authenticate, getBookByUserId)
 
 // Update a book
 router.patch('/:bookid', authorize, updateBook)

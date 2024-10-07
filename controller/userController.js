@@ -96,37 +96,37 @@ export const logIn = async (req, res) => {
     }
 }
 
-export const getMyBooks =  async (req, res) => {
+export const getMyBooks =  async (req , res) => {
     const { title, author, genre } = req.query 
-    const pool = await connectDb()
+    const {userid} = res.locals
 
     try {
-        let query = 'SELECT * FROM books WHERE userid = @userid;'
+        const pool = await connectDb()
+        const request = new sql.Request(pool)
+
+        request.input('userid', sql.Int , userid)
+
+        let query = 'SELECT * FROM [user_books] WHERE userid = @userid'
         
-        if (title) {
-            query += ' AND title LIKE @title;'
-        }
-        if (author) {
-            query += ' AND author LIKE @author;'
-        }
-        if (genre) {
-            query += ' AND genre LIKE @genre;'
-        }
+        // if (title) {
+        //     query += ' AND title LIKE @title'
+        //     request.input('title', sql.NVarChar , `%${title}%`)
 
-        const request = pool.request().input('userid', req.user.userid)
+        // }
+        // if (author) {
+        //     query += ' AND author LIKE @author'
+        //     request.input('author', sql.NVarChar , `%${author}%`)
 
-        if (title) {
-            request.input('title', `%${title}%`)
-        }
-        if (author) {
-            request.input('author', `%${author}%`)
-        }
-        if (genre) {
-            request.input('genre', `%${genre}%`)
-        }
+        // }
+        // if (genre) {
+        //     query += ' AND genre LIKE @genre;'
+        //     request.input('genre', sql.NVarChar ,`%${genre}%`)
+        // }
+
 
         const result = await request.query(query)
-        res.json(result.recordset) 
+
+        return res.status(200).json(result) 
     } catch (error) {
         console.error('Error fetching books:', error)
         res.status(500).json({ error: 'Failed to fetch books.' })

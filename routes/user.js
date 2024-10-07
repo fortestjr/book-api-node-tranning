@@ -11,7 +11,7 @@ router.post('/register', register)
 // User Login
 router.post('/login', logIn)
 
-router.get("/:userid" , authenticate , getMyBooks)
+router.get("/" , authenticate , getMyBooks)
 router.post('/book/:bookid' , authenticate , addBookToUserCollection)
 
 
