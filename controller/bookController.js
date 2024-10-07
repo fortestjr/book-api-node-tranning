@@ -3,98 +3,139 @@ import connectDb from '../db/db.js'
 import dotenv from 'dotenv'
 dotenv.config()
 
-export const createBook = async (req, res) => {
-    const { title, author, genre, description } = req.body;
-    const pool = await connectDb();
+export const createBook = async (req , res) => {
+    const { title, author, genre, description } = req.body
 
     try {
-        const result = await pool.request()
-            .input('userid', req.user.userid)
-            .input('title', title)
-            .input('author', author)
-            .input('genre', genre)
-            .input('description', description)
-            .query('INSERT INTO books (userid, title, author, genre, description) VALUES (@userid, @title, @author, @genre, @description); SELECT SCOPE_IDENTITY() AS bookid;');
 
-        res.status(201).json({ bookid: result.recordset[0].bookid, title });
+        const pool = await connectDb()
+        const request = new sql.Request(pool)
+
+        request.input('userid', res.locals.userid)
+        request.input('title', title)
+        request.input('author', author)
+        request.input('genre', genre)
+        request.input('description', description)
+
+        const insertedBook = 
+        await request
+        .query(
+            `INSERT INTO books (userid, title, author, genre, description)
+                OUTPUT INSERTED.bookid , INSERTED.title , INSERTED.author , INSERTED.genre
+                VALUES (@userid, @title, @author, @genre, @description)`)
+
+        res.status(201).json({ book : insertedBook.recordset[0] })
     } catch (error) {
-        console.error('Error creating book:', error);
-        res.status(500).json({ error: 'Failed to create book.' });
+        console.error('Error creating book:', error)
+        res.status(500).json({ error: 'Failed to create book.' })
     }
 }
 
 export const getBookByUserId =  async (req, res) => {
-    const pool = await connectDb();
-
+    const pool = await connectDb()
     try {
-        const result = await pool.request()
-            .input('userid', req.params.userid)
-            .query('SELECT * FROM books WHERE userid = @userid;');
-        res.json(result.recordset);
+        const request = new sql.Request(pool)
+        request.input('userid', req.params.userid)
+            .query('SELECT * FROM books WHERE userid = @userid;')
+        res.json(result.recordset)
     } catch (error) {
-        console.error('Error fetching books:', error);
-        res.status(500).json({ error: 'Failed to fetch books.' });
+        console.error('Error fetching books:', error)
+        res.status(500).json({ error: 'Failed to fetch books.' })
     }
 }
 
-export const updateBook =  async (req, res) => {
-    const { id } = req.params;
-    const { title, author, genre, description } = req.body;
-    const pool = await connectDb();
-
-    try {
-        const result = await pool.request()
-            .input('bookid', id)
-            .input('userid', req.user.userid)
-            .input('title', title)
-            .input('author', author)
-            .input('genre', genre)
-            .input('description', description)
-            .query('UPDATE books SET title = @title, author = @author, genre = @genre, description = @description WHERE bookid = @bookid AND userid = @userid;');
-
-        if (result.rowsAffected[0] === 0) {
-            return res.status(404).json({ error: 'Book not found or not authorized to update.' });
-        }
-
-        res.json({ message: 'Book updated successfully.' });
-    } catch (error) {
-        console.error('Error updating book:', error);
-        res.status(500).json({ error: 'Failed to update book.' });
-    }
-}
-
-export const deleteBook = async (req, res) => {
+export const updateBook = async (req, res) => {
     const { bookid } = req.params
-    const pool = await connectDb();
-
+    const { title, author, genre, description } = req.body
     try {
-        const result = await pool.request()
-            .input('bookid', bookid)
-            .input('userid', req.user.userid)
-            .query('DELETE FROM books WHERE bookid = @bookid AND userid = @userid;');
+        const pool = await connectDb()
+        const request = new sql.Request(pool)
 
-        if (result.rowsAffected[0] === 0) {
-            return res.status(404).json({ error: 'Book not found or not authorized to delete.'});
+        let query = 'UPDATE books SET '
+        const fields = []
+
+        if (title) {
+            fields.push('title = @title');
+            request.input('title', sql.NVarChar, title);
+        }
+        if (author) {
+            fields.push(' author = @author');
+            request.input('author', sql.NVarChar, author);
+        }
+        if (genre) {
+            fields.push(' genre = @genre');
+            request.input('genre', sql.NVarChar, genre);
+        }
+        if (description) {
+            fields.push(' description = @description');
+            request.input('description', sql.NVarChar, description);
         }
 
-        res.json({ message: 'Book deleted successfully.' });
+        if (fields.length === 0) {
+            return res.status(400).json({ message : "Bad Request" , error: 'No fields to update provided.' })
+        }
+
+        // This keyword specifies that the query should return some result
+        query += fields.join(', ') + ' OUTPUT INSERTED.*  WHERE bookid = @bookid AND userid = @userid;'
+
+        request.input('bookid', sql.Int, bookid)
+            .input('userid', sql.Int, res.locals.userid)
+
+        const updatedBook = await request.query(query)
+
+        if (updatedBook.recordset[0] === 0) {
+            return res.status(404).json({ error: 'Book not found or not authorized to update.' })
+        }
+
+        res.json({ 
+            message: 'Book updated successfully.' ,
+            Book : updatedBook
+        })
     } catch (error) {
-        console.error('Error deleting book:', error);
-        res.status(500).json({ error: 'Failed to delete book.' });
+        console.error('Error updating book:', error)
+        res.status(500).json({ error: 'Failed to update book.' })
+    }
+};
+
+
+export const deleteBook = async (req , res) => {
+    const { bookid } = req.params
+
+    try {
+
+        const pool = await connectDb()
+        const request = new sql.Request(pool)
+        request.input('bookid', sql.Int, bookid)
+            .input('userid', sql.Int, res.locals.userid)
+
+        const deleteBook = await request.query('DELETE FROM [books] OUTPUT DELETED.* WHERE bookid = @bookid AND userid = @userid;')
+
+        if (deleteBook.rowsAffected[0] === 0) {
+            return res.status(404).json({ error: 'Book not found or not authorized to delete.'})
+        }
+
+        res.json({ 
+            message: 'Book deleted successfully.' ,
+            deleteBook 
+        })
+
+    } catch (error) {
+        console.error('Error deleting book:', error)
+        res.status(500).json({ error: 'Failed to delete book.' })
     }
 }
 
 export const getBooksByFIlter = async (req, res) => {
     
-    const { title, author, genre } = req.query; // Query parameters for filtering
-    const pool = await connectDb();
+    const { title, author, genre } = req.query
+    const pool = await connectDb()
 
     try {
         // Base query for selecting all books
         let query = 'SELECT * FROM [books] WHERE 1=1;'
         
         if (title) {
-            query += ' title LIKE @title;'
+            query += ' AND title LIKE @title;'
         }
         if (author) {
             query += ' AND author LIKE @author;'
@@ -103,30 +144,30 @@ export const getBooksByFIlter = async (req, res) => {
             query += ' AND genre LIKE @genre;'
         }
 
-        const request = pool.request()
-            .input('userid', req.user.userid);
+        const request = new sql.Request(pool)
+            request.input('userid', req.user.userid)
 
         // Add parameters for filtering if provided
         if (title) {
-            request.input('title', `%${title}%`);
+            request.input('title', `%${title}%`)
         }
         if (author) {
-            request.input('author', `%${author}%`);
+            request.input('author', `%${author}%`)
         }
         if (genre) {
-            request.input('genre', `%${genre}%`);
+            request.input('genre', `%${genre}%`)
         }
 
-        const result = await request.query(query);
-        res.json(result.recordset); // Send the filtered or unfiltered books to the client
+        const result = await request.query(query)
+        res.json(result.recordset)
     } catch (error) {
-        console.error('Error fetching books:', error);
-        res.status(500).json({ error: 'Failed to fetch books.' });
+        console.error('Error fetching books:', error)
+        res.status(500).json({ error: 'Failed to fetch books.' })
     }
 }
 
 export const addBookToUserCollection = async (req, res) => {
-    const { bookid } = req.body
+    const { bookid } = req.params
     const userid = res.locals.userid 
     if (!bookid) {
         return res.status(400).json({ error: 'Book ID is required' })
